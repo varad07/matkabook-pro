@@ -1,0 +1,8 @@
+**/node_modules
+**/dist
+**/*.log
+**/*.err
+frontend
+.claude
+*.md
+settings.local.json
