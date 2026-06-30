@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import socket from '../../utils/socket';
 import BossLayout from '../../components/BossLayout';
 import api from '../../utils/api';
-import { formatAmount, formatTime, todayISO, formatPana } from '../../utils/format';
+import { formatAmount, formatTime, todayISO, formatNumber } from '../../utils/format';
 
 function groupBy(rows, keyFn) {
   return rows.reduce((acc, row) => {
@@ -14,7 +15,7 @@ function groupBy(rows, keyFn) {
   }, {});
 }
 
-function SummaryTable({ title, data, onRowClick }) {
+function SummaryTable({ title, data, betType, onRowClick }) {
   const sorted = Object.values(data).sort((a, b) => b.total - a.total);
   if (!sorted.length)
     return (
@@ -43,7 +44,7 @@ function SummaryTable({ title, data, onRowClick }) {
                   i % 2 === 0 ? 'bg-dark/40' : 'bg-card'
                 }`}
               >
-                <td className="px-4 py-2 font-mono font-bold text-white">{formatPana(item.key)}</td>
+                <td className="px-4 py-2 font-mono font-bold text-white">{formatNumber(item.key, betType)}</td>
                 <td className="px-4 py-2 text-right text-green-400">{formatAmount(item.total)}</td>
               </tr>
             ))}
@@ -75,7 +76,7 @@ function BrokerModal({ item, onClose }) {
       <div className="bg-card border border-gold/30 rounded-2xl w-full max-w-lg">
         <div className="flex justify-between items-center px-5 py-4 border-b border-gold/10">
           <h3 className="text-gold font-bold">
-            Number: <span className="font-mono">{formatPana(item.key)}</span> — Broker Breakdown
+            Number: <span className="font-mono">{formatNumber(item.key, item.rows[0]?.bet_type)}</span> — Broker Breakdown
           </h3>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-xl">✕</button>
         </div>
@@ -120,6 +121,7 @@ function BrokerModal({ item, onClose }) {
 const PANA_TYPES = ['single_pana', 'double_pana', 'triple_pana'];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [entries,   setEntries]   = useState([]);
   const [markets,   setMarkets]   = useState([]);
   const [marketId,  setMarketId]  = useState('');
@@ -192,6 +194,15 @@ export default function Dashboard() {
 
   return (
     <BossLayout>
+      {/* Quick action */}
+      <button
+        onClick={() => navigate('/boss/submit-for-broker')}
+        className="w-full mb-5 bg-gold hover:bg-darkgold text-black font-bold py-3 px-5 rounded-xl flex items-center justify-center gap-2 text-sm transition-colors active:scale-95"
+      >
+        <span className="text-base">📤</span>
+        Submit Entry For Broker
+      </button>
+
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center gap-3">
         <div>
           <h1 className="text-xl font-bold text-gold">Dashboard</h1>
@@ -220,10 +231,10 @@ export default function Dashboard() {
         <div className="flex justify-center items-center py-20 text-gold text-lg">Loading…</div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <SummaryTable title="Single Ank" data={ankData}       onRowClick={setModal} />
-          <SummaryTable title="Jodi"        data={jodiData}      onRowClick={setModal} />
-          <SummaryTable title="Open Pana"   data={openPanaData}  onRowClick={setModal} />
-          <SummaryTable title="Close Pana"  data={closePanaData} onRowClick={setModal} />
+          <SummaryTable title="Single Ank" data={ankData}       betType="single_ank"   onRowClick={setModal} />
+          <SummaryTable title="Jodi"        data={jodiData}      betType="jodi"          onRowClick={setModal} />
+          <SummaryTable title="Open Pana"   data={openPanaData}  betType="single_pana"   onRowClick={setModal} />
+          <SummaryTable title="Close Pana"  data={closePanaData} betType="single_pana"   onRowClick={setModal} />
         </div>
       )}
 

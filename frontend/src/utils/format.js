@@ -33,3 +33,12 @@ export function calcAnk(pana) {
 export function formatPana(p) {
   return String(p == null ? '' : p).padStart(3, '0');
 }
+
+// Format a number correctly based on its bet type
+// single_ank → as-is (1 digit), jodi → pad to 2, everything else (pana) → pad to 3
+export function formatNumber(number, betType) {
+  const num = String(number == null ? '' : number);
+  if (betType === 'single_ank') return num;
+  if (betType === 'jodi')       return num.padStart(2, '0');
+  return num.padStart(3, '0');
+}

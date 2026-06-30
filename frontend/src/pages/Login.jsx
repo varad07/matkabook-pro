@@ -19,7 +19,7 @@ export default function Login() {
     try {
       const { data } = await api.post('/auth/login', { username, password });
       login(data.token, data.user);
-      if (data.user.role === 'boss') {
+      if (data.user.role === 'boss' || data.user.role === 'employee') {
         navigate('/boss/dashboard', { replace: true });
       } else {
         navigate('/broker/home', { replace: true });

@@ -34,7 +34,17 @@ router.post('/login', async (req, res) => {
             [user.id]
         );
 
-        res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
+        const userPayload = { id: user.id, username: user.username, role: user.role };
+
+        if (user.role === 'employee') {
+            const empResult = await pool.query(
+                'SELECT name FROM employees WHERE user_id = $1',
+                [user.id]
+            );
+            userPayload.employee_name = empResult.rows[0]?.name;
+        }
+
+        res.json({ token, user: userPayload });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Server error' });

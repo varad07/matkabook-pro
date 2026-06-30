@@ -3,17 +3,20 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const NAV = [
-  { path: '/boss/dashboard',   label: 'Dashboard',  icon: '📊' },
-  { path: '/boss/entries',     label: 'Entries',    icon: '📝' },
-  { path: '/boss/results',     label: 'Results',    icon: '🎯' },
-  { path: '/boss/settlements', label: 'Settlements',icon: '💰' },
-  { path: '/boss/brokers',     label: 'Brokers',    icon: '👥' },
-  { path: '/boss/markets',     label: 'Markets',    icon: '🏪' },
-  { path: '/boss/rates',       label: 'Rates',      icon: '📈' },
-  { path: '/boss/reports',     label: 'Reports',    icon: '📋' },
-  { path: '/boss/search',      label: 'Search',     icon: '🔍' },
-  { path: '/boss/audit',       label: 'Audit Logs', icon: '🔒' },
+  { path: '/boss/dashboard',         label: 'Dashboard',        icon: '📊' },
+  { path: '/boss/submit-for-broker', label: 'Submit For Broker', icon: '📤' },
+  { path: '/boss/entries',           label: 'Entries',           icon: '📝' },
+  { path: '/boss/results',           label: 'Results',           icon: '🎯' },
+  { path: '/boss/settlements',       label: 'Settlements',       icon: '💰' },
+  { path: '/boss/brokers',           label: 'Brokers',           icon: '👥' },
+  { path: '/boss/markets',           label: 'Markets',           icon: '🏪' },
+  { path: '/boss/rates',             label: 'Rates',             icon: '📈' },
+  { path: '/boss/reports',           label: 'Reports',           icon: '📋' },
+  { path: '/boss/search',            label: 'Search',            icon: '🔍' },
+  { path: '/boss/audit',             label: 'Audit Logs',        icon: '🔒' },
 ];
+
+const BOSS_ONLY_NAV = { path: '/boss/employees', label: 'Manage Employees', icon: '👤' };
 
 function NavItem({ item, onClick }) {
   return (
@@ -36,22 +39,37 @@ function NavItem({ item, onClick }) {
 
 export default function BossLayout({ children }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { logout } = useAuth();
-  const navigate   = useNavigate();
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
 
   function handleLogout() {
     logout();
     navigate('/');
   }
 
+  const isBoss = user?.role === 'boss';
+
+  const panelLabel = isBoss
+    ? 'Boss Panel'
+    : `Employee Panel${user?.employee_name ? ` — ${user.employee_name}` : ''}`;
+
+  // Build nav list: for bosses, insert Manage Employees after Brokers
+  const navItems = isBoss
+    ? [
+        ...NAV.slice(0, 6),         // Dashboard → Brokers
+        BOSS_ONLY_NAV,              // Manage Employees
+        ...NAV.slice(6),            // Markets → Audit Logs
+      ]
+    : NAV;
+
   const sidebar = (
     <div className="flex flex-col h-full">
       <div className="px-4 py-6 border-b border-gold/20">
         <div className="text-gold font-bold text-xl tracking-wide">🎯 MatkaBook Pro</div>
-        <div className="text-gray-500 text-xs mt-1">Boss Panel</div>
+        <div className="text-gray-500 text-xs mt-1">{panelLabel}</div>
       </div>
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {NAV.map((item) => (
+        {navItems.map((item) => (
           <NavItem key={item.path} item={item} onClick={() => setDrawerOpen(false)} />
         ))}
       </nav>

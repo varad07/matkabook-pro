@@ -1,7 +1,7 @@
 const express = require('express');
 const pool    = require('../../database');
 const { verifyToken }                = require('../middleware/auth');
-const { requireBoss, requireBroker } = require('../middleware/roleCheck');
+const { requireBoss, requireBroker, requireBossOrEmployee, requireAnyRole } = require('../middleware/roleCheck');
 const { getFamilyByPana, getSPByAnk, getDPByAnk } = require('../utils/panaFamilies');
 
 const router = express.Router();
@@ -196,8 +196,180 @@ router.post('/', verifyToken, requireBroker, async (req, res) => {
     }
 });
 
-// GET /api/entries/family/:pana  (broker — pana family lookup)
-router.get('/family/:pana', verifyToken, requireBroker, (req, res) => {
+// POST /api/entries/on-behalf  (boss + employee — submit on behalf of a broker)
+router.post('/on-behalf', verifyToken, requireBossOrEmployee, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { broker_id, market_id, entries, notes } = req.body;
+        const session = req.body.session ?? req.body.bet_side;
+
+        if (!broker_id || !market_id || !session || !Array.isArray(entries) || !entries.length)
+            return res.status(400).json({ error: 'broker_id, market_id, session and entries are required' });
+        if (!['open', 'close'].includes(session))
+            return res.status(400).json({ error: 'session must be open or close' });
+
+        // Validate broker
+        const brokerRes = await client.query(
+            'SELECT id, name FROM brokers WHERE id=$1 AND is_active=TRUE',
+            [broker_id]
+        );
+        if (!brokerRes.rows.length)
+            return res.status(403).json({ error: 'Broker not found or inactive' });
+        const brokerId   = brokerRes.rows[0].id;
+        const brokerName = brokerRes.rows[0].name;
+
+        // Fetch market and validate
+        const marketRes = await client.query(
+            'SELECT * FROM markets WHERE id=$1 AND is_active=TRUE',
+            [market_id]
+        );
+        if (!marketRes.rows.length)
+            return res.status(400).json({ error: 'Market not found or inactive' });
+        const market = marketRes.rows[0];
+
+        const cutoffField  = session === 'open' ? 'open_time'   : 'close_time';
+        const statusField  = session === 'open' ? 'open_status' : 'close_status';
+        const cutoffTime   = market[cutoffField];
+        const marketStatus = market[statusField];
+
+        if (marketStatus === 'stopped')
+            return res.status(400).json({ error: `${session} session is stopped for this market` });
+
+        const resultCheck = await client.query(
+            `SELECT status FROM results
+             WHERE market_id=$1 AND result_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date`,
+            [market_id]
+        );
+        if (resultCheck.rows.length) {
+            const rs = resultCheck.rows[0].status;
+            if (rs === 'complete')
+                return res.status(400).json({ error: 'Market closed. Result already declared.' });
+            if (rs === 'open_declared' && session === 'open')
+                return res.status(400).json({ error: 'Open result declared. Cannot submit open bets.' });
+        }
+
+        const nowTime = await client.query(`SELECT TO_CHAR(NOW() AT TIME ZONE 'Asia/Kolkata', 'HH24:MI') AS t`);
+        const serverHHMM = nowTime.rows[0].t;
+        if (serverHHMM >= cutoffTime)
+            return res.status(400).json({ error: `${session} cutoff time has passed (${cutoffTime})` });
+
+        // Fetch payout rates
+        const ratesRes = await client.query(`SELECT bet_type, rate FROM payout_rates WHERE is_active=TRUE`);
+        const rates = {};
+        for (const r of ratesRes.rows) rates[r.bet_type] = parseFloat(r.rate);
+
+        // Validate and enrich entries
+        const enriched = [];
+        for (const entry of entries) {
+            const { bet_type, number, amount } = entry;
+            if (!bet_type || number === undefined || !amount || amount <= 0)
+                return res.status(400).json({ error: 'Each entry needs bet_type, number, amount > 0' });
+
+            const numStr = bet_type === 'pana' || ['single_pana', 'double_pana', 'triple_pana'].includes(bet_type)
+                ? String(number).padStart(3, '0').trim()
+                : String(number).trim();
+            let resolvedType = bet_type;
+
+            if (bet_type === 'pana') {
+                if (!/^\d{3}$/.test(numStr))
+                    return res.status(400).json({ error: `Invalid pana format: ${numStr}` });
+                const panaRes = await client.query('SELECT pana FROM valid_panas WHERE pana=$1', [numStr]);
+                if (!panaRes.rows.length)
+                    return res.status(400).json({ error: `Invalid Pana: ${numStr}` });
+                resolvedType = detectPanaType(numStr);
+            } else if (['single_pana', 'double_pana', 'triple_pana'].includes(bet_type)) {
+                const panaRes = await client.query('SELECT pana FROM valid_panas WHERE pana=$1', [numStr]);
+                if (!panaRes.rows.length)
+                    return res.status(400).json({ error: `Invalid Pana: ${numStr}` });
+                const detected = detectPanaType(numStr);
+                if (detected !== bet_type)
+                    return res.status(400).json({ error: `Pana ${numStr} is ${detected}, not ${bet_type}` });
+            } else if (bet_type === 'single_ank') {
+                if (!/^[0-9]$/.test(numStr))
+                    return res.status(400).json({ error: `single_ank must be 0-9, got: ${numStr}` });
+            } else if (bet_type === 'jodi') {
+                if (!/^\d{2}$/.test(numStr))
+                    return res.status(400).json({ error: `jodi must be 2 digits, got: ${numStr}` });
+            } else {
+                return res.status(400).json({ error: `Unknown bet_type: ${bet_type}` });
+            }
+
+            const rate = rates[resolvedType];
+            if (!rate)
+                return res.status(400).json({ error: `No active payout rate for ${resolvedType}` });
+
+            enriched.push({
+                bet_type:         resolvedType,
+                number:           numStr,
+                amount:           parseFloat(amount),
+                potential_payout: parseFloat(amount) * rate,
+            });
+        }
+
+        await client.query('BEGIN');
+
+        const countRes = await client.query(
+            `SELECT COUNT(*) FROM entry_batches WHERE market_id=$1 AND entry_date=NOW()::date`,
+            [market_id]
+        );
+        const seq   = parseInt(countRes.rows[0].count) + 1;
+        const today = await client.query(`SELECT NOW()::date AS d`);
+        const token = formatToken(market.code, today.rows[0].d, seq);
+
+        const totalAmount = enriched.reduce((s, e) => s + e.amount, 0);
+
+        const batchRes = await client.query(
+            `INSERT INTO entry_batches
+               (broker_id, market_id, entry_date, session, status, total_amount, token, notes,
+                submitted_by, submitted_by_role)
+             VALUES ($1, $2, NOW()::date, $3, 'confirmed', $4, $5, $6, $7, $8)
+             RETURNING *`,
+            [brokerId, market_id, session, totalAmount, token, notes || null,
+             req.user.id, req.user.role]
+        );
+        const batch = batchRes.rows[0];
+
+        for (const e of enriched) {
+            await client.query(
+                `INSERT INTO entry_items (batch_id, bet_type, number, amount, potential_payout)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [batch.id, e.bet_type, e.number, e.amount, e.potential_payout]
+            );
+        }
+
+        await client.query(
+            `INSERT INTO audit_logs (user_id, action, table_name, record_id, new_values)
+             VALUES ($1, 'entry_submitted_by_employee', 'entry_batches', $2, $3)`,
+            [req.user.id, batch.id,
+             JSON.stringify({ broker_id: brokerId, broker_name: brokerName,
+                              submitted_by_role: req.user.role, token, totalAmount })]
+        );
+
+        await client.query('COMMIT');
+
+        req.app.get('io').emit('new_entry', {
+            token,
+            broker_id:          brokerId,
+            market_id,
+            market_name:        market.name,
+            session,
+            total_amount:       totalAmount,
+            entry_count:        enriched.length,
+            submitted_by_role:  req.user.role,
+        });
+
+        res.status(201).json({ token, batch, entries: enriched });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    } finally {
+        client.release();
+    }
+});
+
+// GET /api/entries/family/:pana  (broker + boss + employee — pana family lookup)
+router.get('/family/:pana', verifyToken, requireAnyRole, (req, res) => {
     const pana = String(req.params.pana).padStart(3, '0');
     if (!/^\d{3}$/.test(pana)) return res.status(400).json({ error: 'pana must be 3 digits' });
     const result = getFamilyByPana(pana);
@@ -211,22 +383,22 @@ router.get('/family/:pana', verifyToken, requireBroker, (req, res) => {
     });
 });
 
-// GET /api/entries/sp/:ank  (broker — SP panas for a given ank digit)
-router.get('/sp/:ank', verifyToken, requireBroker, (req, res) => {
+// GET /api/entries/sp/:ank  (broker + boss + employee — SP panas for a given ank digit)
+router.get('/sp/:ank', verifyToken, requireAnyRole, (req, res) => {
     const { ank } = req.params;
     if (!/^[0-9]$/.test(ank)) return res.status(400).json({ error: 'ank must be a single digit 0–9' });
     res.json(getSPByAnk(ank));
 });
 
-// GET /api/entries/dp/:ank  (broker — DP panas for a given ank digit)
-router.get('/dp/:ank', verifyToken, requireBroker, (req, res) => {
+// GET /api/entries/dp/:ank  (broker + boss + employee — DP panas for a given ank digit)
+router.get('/dp/:ank', verifyToken, requireAnyRole, (req, res) => {
     const { ank } = req.params;
     if (!/^[0-9]$/.test(ank)) return res.status(400).json({ error: 'ank must be a single digit 0–9' });
     res.json(getDPByAnk(ank));
 });
 
-// GET /api/entries/all  (boss only — with filters)
-router.get('/all', verifyToken, requireBoss, async (req, res) => {
+// GET /api/entries/all  (boss + employee — with filters)
+router.get('/all', verifyToken, requireBossOrEmployee, async (req, res) => {
     try {
         const { market_id, date, broker_id, bet_type } = req.query;
 
@@ -248,11 +420,19 @@ router.get('/all', verifyToken, requireBoss, async (req, res) => {
                 b.broker_code, b.name AS broker_name,
                 m.name AS market_name, m.code AS market_code,
                 ei.id AS item_id, ei.bet_type, ei.number, ei.amount,
-                ei.potential_payout, ei.actual_payout, ei.is_winner
+                ei.potential_payout, ei.actual_payout, ei.is_winner,
+                u.username AS submitted_by_username,
+                CASE
+                    WHEN eb.submitted_by_role = 'employee' THEN emp.name
+                    WHEN eb.submitted_by_role = 'broker'   THEN b.name || ' (Self)'
+                    ELSE 'Boss'
+                END AS submitted_by_display
             FROM entry_batches eb
-            JOIN brokers b    ON eb.broker_id = b.id
-            JOIN markets m    ON eb.market_id  = m.id
-            JOIN entry_items ei ON ei.batch_id = eb.id
+            JOIN brokers b      ON eb.broker_id    = b.id
+            JOIN markets m      ON eb.market_id    = m.id
+            JOIN entry_items ei ON ei.batch_id     = eb.id
+            LEFT JOIN users u   ON eb.submitted_by = u.id
+            LEFT JOIN employees emp ON emp.user_id = eb.submitted_by
             ${where}
             ORDER BY eb.entry_date DESC, eb.created_at DESC
         `, params);

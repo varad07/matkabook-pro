@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import socket from '../../utils/socket';
 import BossLayout from '../../components/BossLayout';
 import api from '../../utils/api';
-import { formatAmount, formatTime, todayISO, formatPana } from '../../utils/format';
+import { formatAmount, formatTime, todayISO, formatNumber } from '../../utils/format';
 
 const PAGE_SIZE = 50;
 
@@ -146,7 +146,7 @@ export default function Entries() {
               <table className="w-full text-sm">
                 <thead className="bg-midcard">
                   <tr>
-                    {['Token','Broker','Market','Type','Number','Amount','Time','Actions'].map((h) => (
+                    {['Token','Broker','Market','Type','Number','Amount','Submitted By','Time','Actions'].map((h) => (
                       <th key={h} className="text-gold text-left px-3 py-3 whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -160,8 +160,21 @@ export default function Entries() {
                         <td className="px-3 py-2 text-white whitespace-nowrap">{row.broker_name}</td>
                         <td className="px-3 py-2 text-gray-300 whitespace-nowrap">{row.market_code}</td>
                         <td className="px-3 py-2 text-gray-300 whitespace-nowrap">{row.bet_type}</td>
-                        <td className="px-3 py-2 font-mono font-bold text-white">{formatPana(row.number)}</td>
+                        <td className="px-3 py-2 font-mono font-bold text-white">{formatNumber(row.number, row.bet_type)}</td>
                         <td className="px-3 py-2 text-green-400 whitespace-nowrap">{formatAmount(row.amount)}</td>
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          {row.submitted_by_display ? (
+                            <span className={`text-xs font-semibold ${
+                              row.submitted_by_role === 'broker'
+                                ? 'text-blue-400'
+                                : 'text-gold'
+                            }`}>
+                              {row.submitted_by_display}
+                            </span>
+                          ) : (
+                            <span className="text-gray-600 text-xs">—</span>
+                          )}
+                        </td>
                         <td className="px-3 py-2 text-gray-400 whitespace-nowrap text-xs">{formatTime(row.entry_date)}</td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           {!cancelled && (

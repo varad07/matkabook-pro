@@ -1,12 +1,34 @@
 const express = require('express');
 const pool    = require('../../database');
 const { verifyToken }  = require('../middleware/auth');
-const { requireBoss } = require('../middleware/roleCheck');
+const { requireBoss, requireBossOrEmployee } = require('../middleware/roleCheck');
 
 const router = express.Router();
 
-// GET /api/brokers
-router.get('/', verifyToken, requireBoss, async (req, res) => {
+// GET /api/brokers/search?q=xxx  (boss + employee)
+router.get('/search', verifyToken, requireBossOrEmployee, async (req, res) => {
+    try {
+        const q = req.query.q || '';
+        const { rows } = await pool.query(`
+            SELECT id, broker_code, name, phone
+            FROM brokers
+            WHERE is_active = true
+              AND (
+                LOWER(name)        LIKE '%' || LOWER($1) || '%'
+                OR LOWER(broker_code) LIKE '%' || LOWER($1) || '%'
+              )
+            ORDER BY broker_code ASC
+            LIMIT 20
+        `, [q]);
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// GET /api/brokers  (boss + employee)
+router.get('/', verifyToken, requireBossOrEmployee, async (req, res) => {
     try {
         const { rows } = await pool.query(`
             SELECT b.id, b.broker_code, b.name, b.phone, b.address,

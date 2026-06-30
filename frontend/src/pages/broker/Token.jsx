@@ -1,4 +1,4 @@
-import { formatAmount, formatTime, formatPana } from '../../utils/format';
+import { formatAmount, formatTime, formatNumber } from '../../utils/format';
 
 const BET_LABELS = {
   single_ank:   'Single Ank',
@@ -54,7 +54,7 @@ export default function TokenSuccess({ data, onDone }) {
           {(entries || []).map((item, i) => (
             <div key={i} className={`flex justify-between items-center px-4 py-3 ${i > 0 ? 'border-t border-gold/5' : ''}`}>
               <div>
-                <p className="text-white font-semibold font-mono">{formatPana(item.number)}</p>
+                <p className="text-white font-semibold font-mono">{formatNumber(item.number, item.bet_type)}</p>
                 <p className="text-gray-500 text-xs">{BET_LABELS[item.bet_type] || item.bet_type}</p>
               </div>
               <p className="text-gold font-bold">{formatAmount(item.amount)}</p>

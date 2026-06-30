@@ -15,7 +15,13 @@ const ACTION_COLORS = {
   DISABLE_BROKER:  'text-red-400    border-red-500/30   bg-red-900/20',
   ENABLE_BROKER:   'text-green-400  border-green-500/30 bg-green-900/20',
   RESET_BROKER_PASSWORD: 'text-yellow-400 border-yellow-500/30 bg-yellow-900/20',
-  LOGIN:           'text-gray-400   border-gray-500/30  bg-gray-900/20',
+  LOGIN:                       'text-gray-400   border-gray-500/30  bg-gray-900/20',
+  entry_submitted_by_employee: 'text-blue-400   border-blue-500/30  bg-blue-900/20',
+  employee_created:            'text-green-400  border-green-500/30 bg-green-900/20',
+  employee_updated:            'text-green-400  border-green-500/30 bg-green-900/20',
+  employee_disabled:           'text-red-400    border-red-500/30   bg-red-900/20',
+  employee_enabled:            'text-green-400  border-green-500/30 bg-green-900/20',
+  employee_password_reset:     'text-yellow-400 border-yellow-500/30 bg-yellow-900/20',
 };
 
 function colorFor(action) {

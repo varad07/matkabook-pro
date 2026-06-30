@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import BrokerLayout from '../../components/BrokerLayout';
 import api from '../../utils/api';
-import { formatAmount, formatTime, formatDate, formatPana } from '../../utils/format';
+import { formatAmount, formatTime, formatDate, formatNumber } from '../../utils/format';
 
 const BET_LABELS = {
   single_ank:  'Single Ank',
@@ -134,7 +134,7 @@ export default function BrokerEntries() {
                           {batch.items.map((item, idx) => (
                             <div key={idx} className={`grid grid-cols-4 px-4 py-3 text-sm ${idx > 0 ? 'border-t border-gold/5' : ''}`}>
                               <span className="text-gray-400">{BET_LABELS[item.bet_type] || item.bet_type}</span>
-                              <span className="text-white font-mono font-bold">{formatPana(item.number)}</span>
+                              <span className="text-white font-mono font-bold">{formatNumber(item.number, item.bet_type)}</span>
                               <span className="text-right text-white">{formatAmount(item.amount)}</span>
                               <span className={`text-right font-semibold ${
                                 item.is_winner === true  ? 'text-green-400' :
