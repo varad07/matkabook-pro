@@ -1,12 +1,12 @@
 const express = require('express');
 const pool    = require('../../database');
 const { verifyToken }  = require('../middleware/auth');
-const { requireBoss } = require('../middleware/roleCheck');
+const { requireBossOrEmployee } = require('../middleware/roleCheck');
 
 const router = express.Router();
 
 // GET /api/search?token=&broker=&date=&market_id=&number=&bet_type=
-router.get('/', verifyToken, requireBoss, async (req, res) => {
+router.get('/', verifyToken, requireBossOrEmployee, async (req, res) => {
     try {
         const { token, broker, date, market_id, number, bet_type } = req.query;
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import BossLayout from '../../components/BossLayout';
 import api from '../../utils/api';
-import { formatAmount, todayISO } from '../../utils/format';
+import { formatAmount, formatDate, todayISO } from '../../utils/format';
 
 const TABS = ['Daily', 'Broker', 'Market', 'Date Range'];
 
@@ -39,7 +39,7 @@ function DailyTable({ rows }) {
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} className={`border-t border-gold/5 ${i % 2 === 0 ? 'bg-dark/20' : ''}`}>
-                <td className="px-4 py-2 text-white">{r.broker_name || r.settlement_date}</td>
+                <td className="px-4 py-2 text-white">{r.broker_name || r.settlement_date || formatDate(r.entry_date)}</td>
                 <td className="px-4 py-2 text-gray-300">{formatAmount(r.total_collection)}</td>
                 <td className="px-4 py-2 text-yellow-400">{formatAmount(r.total_commission)}</td>
                 <td className="px-4 py-2 text-red-400">{formatAmount(r.total_winning)}</td>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import BossLayout from '../../components/BossLayout';
 import api from '../../utils/api';
-import { formatAmount, formatTime } from '../../utils/format';
+import { formatAmount, formatTime, formatNumber } from '../../utils/format';
 
 export default function Search() {
   const [markets,   setMarkets]   = useState([]);
@@ -106,7 +106,7 @@ export default function Search() {
                         <td className="px-3 py-2 text-white whitespace-nowrap">{row.broker_name}</td>
                         <td className="px-3 py-2 text-gray-300">{row.market_code}</td>
                         <td className="px-3 py-2 text-gray-300 whitespace-nowrap">{row.bet_type}</td>
-                        <td className="px-3 py-2 font-mono font-bold text-white">{row.number}</td>
+                        <td className="px-3 py-2 font-mono font-bold text-white">{formatNumber(row.number, row.bet_type)}</td>
                         <td className="px-3 py-2 text-green-400">{formatAmount(row.amount)}</td>
                         <td className="px-3 py-2 text-gray-400 text-xs whitespace-nowrap">{formatTime(row.entry_date)}</td>
                       </tr>
@@ -136,7 +136,7 @@ export default function Search() {
                 ['Session',  detail.session],
                 ['Status',   detail.status],
                 ['Bet Type', detail.bet_type],
-                ['Number',   detail.number],
+                ['Number',   formatNumber(detail.number, detail.bet_type)],
                 ['Amount',   formatAmount(detail.amount)],
                 ['Potential Win', formatAmount(detail.potential_payout)],
                 ['Actual Win',    formatAmount(detail.actual_payout)],

@@ -425,11 +425,13 @@ router.get('/all', verifyToken, requireBossOrEmployee, async (req, res) => {
             SELECT
                 eb.id AS batch_id, eb.token, eb.entry_date, eb.session,
                 eb.status, eb.total_amount, eb.notes,
+                eb.created_at AS submitted_at,
                 b.broker_code, b.name AS broker_name,
                 m.name AS market_name, m.code AS market_code,
                 ei.id AS item_id, ei.bet_type, ei.number, ei.amount,
                 ei.potential_payout, ei.actual_payout, ei.is_winner,
                 u.username AS submitted_by_username,
+                eb.submitted_by_role,
                 CASE
                     WHEN eb.submitted_by_role = 'employee' THEN emp.name
                     WHEN eb.submitted_by_role = 'broker'   THEN b.name || ' (Self)'

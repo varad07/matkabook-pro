@@ -175,7 +175,7 @@ export default function Entries() {
                             <span className="text-gray-600 text-xs">—</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-gray-400 whitespace-nowrap text-xs">{formatTime(row.entry_date)}</td>
+                        <td className="px-3 py-2 text-gray-400 whitespace-nowrap text-xs">{formatTime(row.submitted_at || row.entry_date)}</td>
                         <td className="px-3 py-2 whitespace-nowrap">
                           {!cancelled && (
                             <div className="flex gap-1">

@@ -32,6 +32,24 @@ RULES YOU MUST FOLLOW:
 - Always restart the server after backend changes and verify 
   it starts without errors
 
+FRONTEND-SPECIFIC FIX RULES:
+- Always add loading state (spinner) before any async data fetch
+- Always add error state with user-friendly message on API failure
+- Always add empty state ("No data yet") when array is empty
+- Always add null/undefined checks before .map() or accessing 
+  nested object properties (e.g. data?.items?.map(...) not 
+  data.items.map(...))
+- Disable submit buttons while request is in-flight to prevent 
+  duplicate submissions
+- Use AbortController or request sequence numbers to prevent 
+  race conditions in rapid-fire API calls (like family lookup 
+  while typing)
+- Always use formatNumber(number, betType) helper for displaying 
+  single_ank (no pad), jodi (2 digit pad), pana (3 digit pad) - 
+  never hardcode padStart in display code
+- Test fix by reading the component again after editing to 
+  confirm logic is sound
+
 OUTPUT FORMAT after fixing each bug:
 
 FIXED: [Bug title]

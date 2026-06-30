@@ -44,7 +44,7 @@ export default function BrokerEntries() {
   }, []);
 
   const filtered = marketFilter
-    ? entries.filter((batch) => batch.market_id === marketFilter)
+    ? entries.filter((batch) => String(batch.market_id) === marketFilter)
     : entries;
 
   const grouped = groupEntries(filtered);

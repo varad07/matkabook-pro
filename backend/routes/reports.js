@@ -120,12 +120,18 @@ router.get('/market', verifyToken, requireBoss, async (req, res) => {
         );
 
         const totals = rows.reduce(
-            (acc, r) => ({
-                total_collection: acc.total_collection + parseFloat(r.total_collection),
-                total_commission: acc.total_commission + parseFloat(r.total_commission),
-                total_winning:    acc.total_winning    + parseFloat(r.total_winning),
-            }),
-            { total_collection: 0, total_commission: 0, total_winning: 0 }
+            (acc, r) => {
+                const col  = parseFloat(r.total_collection);
+                const com  = parseFloat(r.total_commission);
+                const win  = parseFloat(r.total_winning);
+                return {
+                    total_collection: acc.total_collection + col,
+                    total_commission: acc.total_commission + com,
+                    total_winning:    acc.total_winning    + win,
+                    net_settlement:   acc.net_settlement   + (col - com - win),
+                };
+            },
+            { total_collection: 0, total_commission: 0, total_winning: 0, net_settlement: 0 }
         );
 
         res.json({ market: marketInfo.rows[0], from, to, daily: rows, totals });
