@@ -144,13 +144,13 @@ router.post('/', verifyToken, requireBroker, async (req, res) => {
 
         await client.query('BEGIN');
 
-        // Generate token sequence
+        // Generate token sequence (use IST date for consistency with result_date)
         const countRes = await client.query(
-            `SELECT COUNT(*) FROM entry_batches WHERE market_id=$1 AND entry_date=NOW()::date`,
+            `SELECT COUNT(*) FROM entry_batches WHERE market_id=$1 AND entry_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date`,
             [market_id]
         );
         const seq   = parseInt(countRes.rows[0].count) + 1;
-        const today = await client.query(`SELECT NOW()::date AS d`);
+        const today = await client.query(`SELECT (NOW() AT TIME ZONE 'Asia/Kolkata')::date AS d`);
         const token = formatToken(market.code, today.rows[0].d, seq);
 
         const totalAmount = enriched.reduce((s, e) => s + e.amount, 0);
@@ -158,7 +158,7 @@ router.post('/', verifyToken, requireBroker, async (req, res) => {
         const batchRes = await client.query(
             `INSERT INTO entry_batches
                (broker_id, market_id, entry_date, session, status, total_amount, token, notes)
-             VALUES ($1, $2, NOW()::date, $3, 'confirmed', $4, $5, $6)
+             VALUES ($1, $2, (NOW() AT TIME ZONE 'Asia/Kolkata')::date, $3, 'confirmed', $4, $5, $6)
              RETURNING *`,
             [brokerId, market_id, session, totalAmount, token, notes || null]
         );
@@ -317,11 +317,11 @@ router.post('/on-behalf', verifyToken, requireBossOrEmployee, async (req, res) =
         await client.query('BEGIN');
 
         const countRes = await client.query(
-            `SELECT COUNT(*) FROM entry_batches WHERE market_id=$1 AND entry_date=NOW()::date`,
+            `SELECT COUNT(*) FROM entry_batches WHERE market_id=$1 AND entry_date=(NOW() AT TIME ZONE 'Asia/Kolkata')::date`,
             [market_id]
         );
         const seq   = parseInt(countRes.rows[0].count) + 1;
-        const today = await client.query(`SELECT NOW()::date AS d`);
+        const today = await client.query(`SELECT (NOW() AT TIME ZONE 'Asia/Kolkata')::date AS d`);
         const token = formatToken(market.code, today.rows[0].d, seq);
 
         const totalAmount = enriched.reduce((s, e) => s + e.amount, 0);
@@ -330,7 +330,7 @@ router.post('/on-behalf', verifyToken, requireBossOrEmployee, async (req, res) =
             `INSERT INTO entry_batches
                (broker_id, market_id, entry_date, session, status, total_amount, token, notes,
                 submitted_by, submitted_by_role)
-             VALUES ($1, $2, NOW()::date, $3, 'confirmed', $4, $5, $6, $7, $8)
+             VALUES ($1, $2, (NOW() AT TIME ZONE 'Asia/Kolkata')::date, $3, 'confirmed', $4, $5, $6, $7, $8)
              RETURNING *`,
             [brokerId, market_id, session, totalAmount, token, notes || null,
              req.user.id, req.user.role]

@@ -5,6 +5,20 @@ const { requireBoss } = require('../middleware/roleCheck');
 
 const router = express.Router();
 
+// Normalize a bet number for winner comparison
+function normalizeForCompare(value, betType) {
+    const v = String(value == null ? '' : value).trim();
+    if (betType === 'single_ank') return v.replace(/^0+/, '') || '0';
+    if (betType === 'jodi')       return v.padStart(2, '0');
+    return v.padStart(3, '0'); // single_pana, double_pana, triple_pana
+}
+
+// Safe parseFloat: returns 0 for NaN/null/undefined to prevent JSON.stringify(NaN)=null poison
+function safeFloat(val) {
+    const n = parseFloat(val);
+    return isFinite(n) ? n : 0;
+}
+
 // POST /api/results/declare-open
 router.post('/declare-open', verifyToken, requireBoss, async (req, res) => {
     const client = await pool.connect();
@@ -115,16 +129,21 @@ router.post('/declare-close', verifyToken, requireBoss, async (req, res) => {
             let isWinner = false;
 
             if (item.bet_type === 'single_ank') {
-                isWinner = String(item.number) === String(result.open_ank) ||
-                           String(item.number) === String(closeAnk);
+                const entryNum   = normalizeForCompare(item.number, 'single_ank');
+                const openAnkStr = normalizeForCompare(result.open_ank, 'single_ank');
+                const closeAnkStr= normalizeForCompare(closeAnk, 'single_ank');
+                isWinner = entryNum === openAnkStr || entryNum === closeAnkStr;
             } else if (item.bet_type === 'jodi') {
-                isWinner = item.number === jodi;
+                const entryJodi  = normalizeForCompare(item.number, 'jodi');
+                const resultJodi = normalizeForCompare(jodi, 'jodi');
+                isWinner = entryJodi === resultJodi;
             } else if (['single_pana', 'double_pana', 'triple_pana'].includes(item.bet_type)) {
                 const targetPana = item.session === 'open' ? result.open_pana : close_pana;
-                isWinner = String(item.number).padStart(3, '0') === String(targetPana).padStart(3, '0');
+                isWinner = normalizeForCompare(item.number, 'pana') ===
+                           normalizeForCompare(targetPana, 'pana');
             }
 
-            const actualPayout = isWinner ? parseFloat(item.potential_payout) : 0;
+            const actualPayout = isWinner ? safeFloat(item.potential_payout) : 0;
 
             await client.query(
                 `UPDATE entry_items SET is_winner=$1, actual_payout=$2 WHERE id=$3`,
@@ -134,7 +153,7 @@ router.post('/declare-close', verifyToken, requireBoss, async (req, res) => {
             if (!brokerMap[item.broker_id]) {
                 brokerMap[item.broker_id] = { totalCollection: 0, totalWinning: 0 };
             }
-            brokerMap[item.broker_id].totalCollection += parseFloat(item.amount);
+            brokerMap[item.broker_id].totalCollection += safeFloat(item.amount);
             if (isWinner) brokerMap[item.broker_id].totalWinning += actualPayout;
         }
 
@@ -147,9 +166,11 @@ router.post('/declare-close', verifyToken, requireBoss, async (req, res) => {
 
         // Create settlement record per broker
         for (const [brokerId, data] of Object.entries(brokerMap)) {
-            const commission    = data.totalCollection * 0.10;
-            const netCollection = data.totalCollection - commission;
-            const netSettlement = netCollection - data.totalWinning;
+            const totalCollection = safeFloat(data.totalCollection);
+            const totalWinning    = safeFloat(data.totalWinning);
+            const commission    = totalCollection * 0.10;
+            const netCollection = totalCollection - commission;
+            const netSettlement = netCollection - totalWinning;
             const settlementAmt = Math.abs(netSettlement);
             const settlementType = netSettlement >= 0 ? 'loss' : 'winning';
 
@@ -172,14 +193,14 @@ router.post('/declare-close', verifyToken, requireBoss, async (req, res) => {
                     balanceBefore, balanceAfter,
                     JSON.stringify({
                         result_id,
-                        market_id:       result.market_id,
-                        date:            result.result_date,
-                        total_collection: data.totalCollection,
+                        market_id:        result.market_id,
+                        date:             result.result_date,
+                        total_collection: totalCollection,
                         commission,
-                        net_collection:  netCollection,
-                        total_winning:   data.totalWinning,
-                        net_settlement:  netSettlement,
-                        direction:       netSettlement >= 0 ? 'broker_pays' : 'boss_pays',
+                        net_collection:   netCollection,
+                        total_winning:    totalWinning,
+                        net_settlement:   netSettlement,
+                        direction:        netSettlement >= 0 ? 'broker_pays' : 'boss_pays',
                     }),
                     req.user.id,
                 ]
