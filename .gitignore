@@ -27,6 +27,10 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Claude
-.claude/
+# Claude — ignore everything except shared agent definitions
+.claude/memory/
+.claude/projects/
+.claude/todos/
+.claude/settings.json
+.claude/settings.local.json
 settings.local.json
