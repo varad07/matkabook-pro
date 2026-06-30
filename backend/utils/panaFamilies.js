@@ -75,8 +75,7 @@ function getFamilyByPana(inputPana) {
     // bit i = 0 → use digits[i]; bit i = 1 → use cuts[i]
     const combo     = digits.map((d, i) => ((mask >> i) & 1) ? cuts[i] : d);
     const formatted = formatPana(combo);
-    if (formatted[0] === '0') continue;               // no leading zero
-    if (!validPanaSet.has(formatted)) continue;        // must be valid
+    if (!validPanaSet.has(formatted)) continue;        // must be valid pana (handles all invalid combos)
     if (!results.includes(formatted)) results.push(formatted);
   }
 

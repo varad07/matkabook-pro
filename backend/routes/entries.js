@@ -87,13 +87,17 @@ router.post('/', verifyToken, requireBroker, async (req, res) => {
         const enriched = [];
         for (const entry of entries) {
             const { bet_type, number, amount } = entry;
-            if (!bet_type || number === undefined || !amount || amount <= 0)
-                return res.status(400).json({ error: 'Each entry needs bet_type, number, amount > 0' });
+            const parsedAmount = parseFloat(amount);
+            if (!bet_type || number === undefined || number === null || !isFinite(parsedAmount) || parsedAmount <= 0)
+                return res.status(400).json({ error: 'Each entry needs bet_type, number, and amount > 0' });
+
+            const rawNumber = String(number).trim();
+            if (!rawNumber) return res.status(400).json({ error: 'number is required' });
 
             // Always keep as padded 3-char string — never parseInt (000 would become 0)
             const numStr = bet_type === 'pana' || ['single_pana','double_pana','triple_pana'].includes(bet_type)
-                ? String(number).padStart(3, '0').trim()
-                : String(number).trim();
+                ? rawNumber.padStart(3, '0')
+                : rawNumber;
             let resolvedType = bet_type;
 
             if (bet_type === 'pana') {
@@ -133,8 +137,8 @@ router.post('/', verifyToken, requireBroker, async (req, res) => {
             enriched.push({
                 bet_type:         resolvedType,
                 number:           numStr,
-                amount:           parseFloat(amount),
-                potential_payout: parseFloat(amount) * rate,
+                amount:           parsedAmount,
+                potential_payout: parsedAmount * rate,
             });
         }
 
@@ -262,12 +266,16 @@ router.post('/on-behalf', verifyToken, requireBossOrEmployee, async (req, res) =
         const enriched = [];
         for (const entry of entries) {
             const { bet_type, number, amount } = entry;
-            if (!bet_type || number === undefined || !amount || amount <= 0)
-                return res.status(400).json({ error: 'Each entry needs bet_type, number, amount > 0' });
+            const parsedAmount = parseFloat(amount);
+            if (!bet_type || number === undefined || number === null || !isFinite(parsedAmount) || parsedAmount <= 0)
+                return res.status(400).json({ error: 'Each entry needs bet_type, number, and amount > 0' });
+
+            const rawNumber = String(number).trim();
+            if (!rawNumber) return res.status(400).json({ error: 'number is required' });
 
             const numStr = bet_type === 'pana' || ['single_pana', 'double_pana', 'triple_pana'].includes(bet_type)
-                ? String(number).padStart(3, '0').trim()
-                : String(number).trim();
+                ? rawNumber.padStart(3, '0')
+                : rawNumber;
             let resolvedType = bet_type;
 
             if (bet_type === 'pana') {
@@ -301,8 +309,8 @@ router.post('/on-behalf', verifyToken, requireBossOrEmployee, async (req, res) =
             enriched.push({
                 bet_type:         resolvedType,
                 number:           numStr,
-                amount:           parseFloat(amount),
-                potential_payout: parseFloat(amount) * rate,
+                amount:           parsedAmount,
+                potential_payout: parsedAmount * rate,
             });
         }
 

@@ -18,10 +18,19 @@ router.get('/', verifyToken, async (req, res) => {
     }
 });
 
+function isValidTime(t) {
+    return typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+}
+
 // PUT /api/markets/:id
 router.put('/:id', verifyToken, requireBoss, async (req, res) => {
     try {
         const { name, open_time, close_time, is_active } = req.body;
+
+        if (open_time  !== undefined && !isValidTime(open_time))
+            return res.status(400).json({ error: 'open_time must be in HH:MM format (24h), e.g. 14:30' });
+        if (close_time !== undefined && !isValidTime(close_time))
+            return res.status(400).json({ error: 'close_time must be in HH:MM format (24h), e.g. 14:30' });
 
         const old = await pool.query('SELECT * FROM markets WHERE id=$1', [req.params.id]);
         if (!old.rows.length) return res.status(404).json({ error: 'Market not found' });

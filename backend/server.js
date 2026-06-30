@@ -15,6 +15,7 @@ const reportRoutes      = require('./routes/reports');
 const searchRoutes      = require('./routes/search');
 const auditRoutes       = require('./routes/audit');
 const employeeRoutes    = require('./routes/employees');
+const ratesRoutes       = require('./routes/rates');
 
 const app    = express();
 const server = http.createServer(app);
@@ -35,6 +36,7 @@ app.use('/api/reports',     reportRoutes);
 app.use('/api/search',      searchRoutes);
 app.use('/api/audit',       auditRoutes);
 app.use('/api/employees',   employeeRoutes);
+app.use('/api/rates',       ratesRoutes);
 
 io.on('connection', (socket) => {
     socket.on('disconnect', () => {});

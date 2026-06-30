@@ -10,9 +10,10 @@ router.post('/declare-open', verifyToken, requireBoss, async (req, res) => {
     const client = await pool.connect();
     try {
         const { market_id, date } = req.body;
-        const open_pana = String(req.body.open_pana || '').padStart(3, '0');
-        if (!market_id || !date || !open_pana || open_pana === '000'.padStart(0))
+        const raw_open_pana = req.body.open_pana;
+        if (!market_id || !date || raw_open_pana === undefined || raw_open_pana === null || String(raw_open_pana).trim() === '')
             return res.status(400).json({ error: 'market_id, date and open_pana are required' });
+        const open_pana = String(raw_open_pana).padStart(3, '0');
 
         const panaRes = await client.query(
             'SELECT ank FROM valid_panas WHERE pana=$1',
